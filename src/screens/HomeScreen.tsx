@@ -23,10 +23,15 @@ import { useCart } from "../context/CartContext";
 type HomeScreenNavigationProp = StackNavigationProp<RootStackParamList, "Home">;
 
 const HomeScreen: React.FC = () => {
+    // Estados principais
     const [products, setProducts] = useState<Product[]>([]);
     const [loading, setLoading] = useState(true);
     const [isModalVisible, setModalVisible] = useState(false);
-    
+
+    // --- NOVO: Estados para a funcionalidade de pesquisa ---
+    const [searchQuery, setSearchQuery] = useState("");
+    const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
+
     // Estados para o formulário no Modal
     const [newProductName, setNewProductName] = useState("");
     const [newProductPrice, setNewProductPrice] = useState("");
@@ -41,6 +46,7 @@ const HomeScreen: React.FC = () => {
             setLoading(true);
             const response = await axios.get(API_URL);
             setProducts(response.data);
+            setFilteredProducts(response.data); // Inicializa a lista filtrada
         } catch (error) {
             console.error("Erro ao buscar produtos:", error);
             Alert.alert("Erro", "Não foi possível carregar os produtos.");
@@ -53,37 +59,59 @@ const HomeScreen: React.FC = () => {
         fetchProducts();
     }, []);
 
+    // --- NOVO: Efeito para aplicar o filtro de pesquisa ---
+    useEffect(() => {
+        if (searchQuery.trim() === "") {
+            setFilteredProducts(products);
+        } else {
+            const lowercasedQuery = searchQuery.toLowerCase();
+            const filtered = products.filter(product =>
+                product.name.toLowerCase().includes(lowercasedQuery)
+            );
+            setFilteredProducts(filtered);
+        }
+    }, [searchQuery, products]);
+
     const handleAddProduct = async () => {
+        // ... (lógica de adicionar produto mantida)
         if (!newProductName.trim() || !newProductPrice.trim()) {
             Alert.alert("Atenção", "Por favor, preencha todos os campos!");
             return;
         }
+        // Validação de preço
+        const priceNumber = parseFloat(newProductPrice.replace(',', '.'));
+        if (isNaN(priceNumber) || priceNumber <= 0) {
+            Alert.alert("Erro", "Por favor, insira um preço válido.");
+            return;
+        }
         try {
-            const newProduct = {
-                name: newProductName,
-                price: newProductPrice,
-            };
+            const newProduct = { name: newProductName, price: priceNumber.toString() };
             await axios.post(API_URL, newProduct);
             setNewProductName("");
             setNewProductPrice("");
             setModalVisible(false);
-            fetchProducts(); // Re-fetch para mostrar o novo produto
+            fetchProducts();
         } catch (error) {
             console.error("Erro ao cadastrar produto:", error);
             Alert.alert("Erro", "Ocorreu um erro ao cadastrar o produto.");
         }
     };
 
+    // --- UI APRIMORADA: Card de produto com visual mais limpo ---
     const renderProduct = ({ item }: { item: Product }) => (
-        <View style={styles.productCard}>
+        <TouchableOpacity
+            onPress={() => navigation.navigate('ProductDetail', { productId: item.id })}
+            style={styles.productCard}
+            activeOpacity={0.7} // Efeito visual ao clicar
+        >
             <View style={styles.productInfo}>
                 <Text style={styles.productName}>{item.name}</Text>
                 <Text style={styles.productPrice}>R$ {parseFloat(item.price).toFixed(2)}</Text>
             </View>
             <TouchableOpacity style={styles.addToCartButton} onPress={() => addToCart(item)}>
-                <Ionicons name="cart-outline" size={24} color="#fff" />
+                <Ionicons name="add" size={24} color="#007bff" />
             </TouchableOpacity>
-        </View>
+        </TouchableOpacity>
     );
 
     if (loading) {
@@ -92,27 +120,42 @@ const HomeScreen: React.FC = () => {
 
     return (
         <SafeAreaView style={styles.container}>
+            {/* --- UI APRIMORADA: Cabeçalho com título, pesquisa e carrinho --- */}
+            <View style={styles.header}>
+                <Text style={styles.headerTitle}>Produtos</Text>
+                <TouchableOpacity style={styles.cartIcon} onPress={() => navigation.navigate("Carrinho")}>
+                    <Ionicons name="cart-outline" size={28} color="#333" />
+                    {cartItemCount > 0 && (
+                        <View style={styles.cartBadge}>
+                            <Text style={styles.cartBadgeText}>{cartItemCount}</Text>
+                        </View>
+                    )}
+                </TouchableOpacity>
+            </View>
+
+            {/* --- NOVO: Barra de Pesquisa --- */}
+            <View style={styles.searchSection}>
+                <Ionicons name="search-outline" size={20} color="#888" style={styles.searchIcon} />
+                <TextInput
+                    style={styles.searchInput}
+                    placeholder="Pesquisar por nome..."
+                    value={searchQuery}
+                    onChangeText={setSearchQuery}
+                    placeholderTextColor="#888"
+                />
+            </View>
+
             <FlatList
-                data={products}
+                data={filteredProducts} // Usa a lista filtrada
                 renderItem={renderProduct}
                 keyExtractor={(item) => item.id.toString()}
                 contentContainerStyle={styles.listContainer}
                 ListEmptyComponent={<Text style={styles.emptyText}>Nenhum produto encontrado.</Text>}
             />
 
-            {/* Botão Flutuante para adicionar produto */}
+            {/* Botão Flutuante para adicionar produto (FAB) */}
             <TouchableOpacity style={styles.fab} onPress={() => setModalVisible(true)}>
                 <Ionicons name="add" size={30} color="white" />
-            </TouchableOpacity>
-            
-            {/* Ícone do Carrinho com contador */}
-            <TouchableOpacity style={styles.cartIcon} onPress={() => navigation.navigate("Carrinho")}>
-                <Ionicons name="cart" size={30} color="white" />
-                {cartItemCount > 0 && (
-                    <View style={styles.cartBadge}>
-                        <Text style={styles.cartBadgeText}>{cartItemCount}</Text>
-                    </View>
-                )}
             </TouchableOpacity>
 
             {/* Modal para Adicionar Produto */}
@@ -132,15 +175,19 @@ const HomeScreen: React.FC = () => {
                             style={styles.input}
                         />
                         <TextInput
-                            placeholder="Preço"
+                            placeholder="Preço (ex: 29.99)"
                             value={newProductPrice}
                             onChangeText={setNewProductPrice}
                             keyboardType="numeric"
                             style={styles.input}
                         />
                         <View style={styles.modalButtons}>
-                            <Button title="Cancelar" onPress={() => setModalVisible(false)} color="#dc3545" />
-                            <Button title="Cadastrar" onPress={handleAddProduct} />
+                            <TouchableOpacity style={[styles.modalButton, styles.cancelButton]} onPress={() => setModalVisible(false)}>
+                                <Text style={styles.modalButtonText}>Cancelar</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity style={[styles.modalButton, styles.submitButton]} onPress={handleAddProduct}>
+                                <Text style={styles.modalButtonText}>Cadastrar</Text>
+                            </TouchableOpacity>
                         </View>
                     </View>
                 </View>
@@ -149,68 +196,95 @@ const HomeScreen: React.FC = () => {
     );
 };
 
+// --- ESTILOS APRIMORADOS ---
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: '#f8f9fa' },
+    container: { flex: 1, backgroundColor: '#f0f2f5' },
     centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-    listContainer: { padding: 20 },
-    productCard: {
+    header: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingHorizontal: 20,
+        paddingTop: 20,
+        paddingBottom: 10,
+        backgroundColor: '#f0f2f5',
+    },
+    headerTitle: {
+        fontSize: 24,
+        fontWeight: 'bold',
+        color: '#1c1c1e',
+    },
+    cartIcon: {
+        padding: 5,
+    },
+    cartBadge: {
+        position: 'absolute',
+        right: -6,
+        top: -3,
+        backgroundColor: '#007bff',
+        borderRadius: 10,
+        width: 20,
+        height: 20,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    cartBadgeText: { color: 'white', fontSize: 12, fontWeight: 'bold' },
+    searchSection: {
+        flexDirection: 'row',
+        alignItems: 'center',
         backgroundColor: '#fff',
         borderRadius: 10,
+        marginHorizontal: 20,
+        marginBottom: 10,
+        paddingHorizontal: 10,
+        elevation: 2,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.1,
+        shadowRadius: 2,
+    },
+    searchIcon: {
+        marginRight: 5,
+    },
+    searchInput: {
+        flex: 1,
+        height: 45,
+        fontSize: 16,
+    },
+    listContainer: { paddingHorizontal: 20, paddingBottom: 80 },
+    productCard: {
+        backgroundColor: '#fff',
+        borderRadius: 12,
         padding: 15,
         marginBottom: 15,
         flexDirection: 'row',
-        justifyContent: 'space-between',
         alignItems: 'center',
         elevation: 3,
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.1,
-        shadowRadius: 2,
+        shadowRadius: 4,
     },
-    productInfo: { flex: 1 },
-    productName: { fontSize: 18, fontWeight: 'bold', color: '#333' },
-    productPrice: { fontSize: 16, color: '#007bff', marginTop: 5 },
+    productInfo: { flex: 1, marginRight: 10 },
+    productName: { fontSize: 18, fontWeight: '600', color: '#333' },
+    productPrice: { fontSize: 16, color: '#007bff', marginTop: 5, fontWeight: 'bold' },
     addToCartButton: {
-        backgroundColor: '#28a745',
-        padding: 10,
+        backgroundColor: '#eaf4ff',
+        padding: 12,
         borderRadius: 50,
     },
     fab: {
         position: 'absolute',
         right: 20,
-        bottom: 100,
+        bottom: 20,
         backgroundColor: '#007bff',
         width: 60,
         height: 60,
         borderRadius: 30,
         justifyContent: 'center',
         alignItems: 'center',
-        elevation: 5,
+        elevation: 8,
     },
-    cartIcon: {
-        position: 'absolute',
-        right: 20,
-        bottom: 20,
-        backgroundColor: '#28a745',
-        width: 60,
-        height: 60,
-        borderRadius: 30,
-        justifyContent: 'center',
-        alignItems: 'center',
-        elevation: 5,
-    },
-    cartBadge: {
-        position: 'absolute',
-        right: -5,
-        top: -5,
-        backgroundColor: '#dc3545',
-        borderRadius: 15,
-        width: 24,
-        height: 24,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    cartBadgeText: { color: 'white', fontSize: 12, fontWeight: 'bold' },
     emptyText: { textAlign: 'center', marginTop: 50, fontSize: 16, color: '#6c757d' },
     modalContainer: {
         flex: 1,
@@ -219,31 +293,49 @@ const styles = StyleSheet.create({
         backgroundColor: 'rgba(0,0,0,0.5)',
     },
     modalView: {
-        width: '80%',
+        width: '90%',
         backgroundColor: 'white',
-        borderRadius: 10,
-        padding: 20,
-        alignItems: 'center',
+        borderRadius: 20,
+        padding: 25,
+        alignItems: 'stretch',
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.25,
         shadowRadius: 4,
         elevation: 5,
     },
-    modalTitle: { fontSize: 20, fontWeight: 'bold', marginBottom: 15 },
+    modalTitle: { fontSize: 22, fontWeight: 'bold', marginBottom: 20, textAlign: 'center' },
     input: {
-        width: '100%',
-        borderWidth: 1,
-        borderColor: '#ccc',
-        padding: 10,
+        height: 50,
+        backgroundColor: '#f0f2f5',
+        borderRadius: 10,
+        paddingHorizontal: 15,
         marginBottom: 15,
-        borderRadius: 5,
+        fontSize: 16,
     },
     modalButtons: {
         flexDirection: 'row',
-        justifyContent: 'space-around',
-        width: '100%',
+        justifyContent: 'space-between',
+        marginTop: 10,
     },
+    modalButton: {
+        flex: 1,
+        paddingVertical: 12,
+        borderRadius: 10,
+        alignItems: 'center',
+    },
+    cancelButton: {
+        backgroundColor: '#f8f8f8',
+        marginRight: 10,
+    },
+    submitButton: {
+        backgroundColor: '#007bff',
+    },
+    modalButtonText: {
+        fontSize: 16,
+        fontWeight: 'bold',
+        color: '#fff',
+    }
 });
 
 export default HomeScreen;
