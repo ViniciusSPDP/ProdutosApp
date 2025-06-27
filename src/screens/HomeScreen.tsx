@@ -1,3 +1,5 @@
+// src/screens/HomeScreen.tsx
+
 import React, { useEffect, useState } from "react";
 import {
     View,
@@ -35,6 +37,9 @@ const HomeScreen: React.FC = () => {
     // Estados para o formulário no Modal
     const [newProductName, setNewProductName] = useState("");
     const [newProductPrice, setNewProductPrice] = useState("");
+    const [newProductDescription, setNewProductDescription] = useState(""); // NOVO: Estado para a descrição
+    const [newProductCategory, setNewProductCategory] = useState(""); // 1. Adicionar estado para a categoria
+
 
     const navigation = useNavigation<HomeScreenNavigationProp>();
     const { addToCart, cartItemCount } = useCart();
@@ -74,7 +79,7 @@ const HomeScreen: React.FC = () => {
 
     const handleAddProduct = async () => {
         // ... (lógica de adicionar produto mantida)
-        if (!newProductName.trim() || !newProductPrice.trim()) {
+        if (!newProductName.trim() || !newProductCategory.trim() || !newProductPrice.trim() || !newProductDescription.trim()) { // Adicionada validação para description
             Alert.alert("Atenção", "Por favor, preencha todos os campos!");
             return;
         }
@@ -85,10 +90,17 @@ const HomeScreen: React.FC = () => {
             return;
         }
         try {
-            const newProduct = { name: newProductName, price: priceNumber.toString() };
+            const newProduct = { // Incluindo description no objeto do novo produto
+                name: newProductName,
+                price: priceNumber.toString(),
+                description: newProductDescription,
+                category: newProductCategory
+            };
             await axios.post(API_URL, newProduct);
             setNewProductName("");
             setNewProductPrice("");
+            setNewProductDescription(""); // Limpa o campo de descrição após adicionar
+            setNewProductCategory(""); // Limpar o estado da categoria
             setModalVisible(false);
             fetchProducts();
         } catch (error) {
@@ -180,6 +192,20 @@ const HomeScreen: React.FC = () => {
                             onChangeText={setNewProductPrice}
                             keyboardType="numeric"
                             style={styles.input}
+                        />
+                        <TextInput
+                            placeholder="Categoria do produto"
+                            value={newProductCategory}
+                            onChangeText={setNewProductCategory}
+                            style={styles.input}
+                        />
+                        <TextInput // NOVO: Campo para a descrição do produto
+                            placeholder="Descrição do produto"
+                            value={newProductDescription}
+                            onChangeText={setNewProductDescription}
+                            multiline
+                            numberOfLines={4}
+                            style={[styles.input, styles.descriptionInput]}
                         />
                         <View style={styles.modalButtons}>
                             <TouchableOpacity style={[styles.modalButton, styles.cancelButton]} onPress={() => setModalVisible(false)}>
@@ -312,6 +338,11 @@ const styles = StyleSheet.create({
         paddingHorizontal: 15,
         marginBottom: 15,
         fontSize: 16,
+    },
+    descriptionInput: { // NOVO: Estilo para o campo de descrição
+        height: 100, // Altura maior para a descrição
+        textAlignVertical: 'top', // Alinha o texto no topo em Android
+        paddingTop: 15, // Espaçamento interno superior para o texto
     },
     modalButtons: {
         flexDirection: 'row',

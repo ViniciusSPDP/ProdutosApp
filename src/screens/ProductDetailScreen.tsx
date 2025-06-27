@@ -53,12 +53,12 @@ const ProductDetailScreen: React.FC = () => {
         );
     }
     
-    // Como a API não fornece uma descrição, vamos criar uma de exemplo.
-    const productDescription = `Descubra a qualidade e o design incrível do ${product.name}. Perfeito para o seu dia a dia, combinando estilo e funcionalidade. Feito com materiais de alta durabilidade, este produto é um investimento que vale a pena.`;
+    // A descrição agora vem diretamente do objeto 'product'
+    const productDescription = product.description; 
 
     return (
         <ScrollView style={styles.container}>
-            {/* Usamos uma imagem de placeholder, já que a API não fornece uma URL */}
+            {/* Imagem de placeholder */}
             <Image 
                 source={{ uri: `https://via.placeholder.com/400x300.png/007bff/FFFFFF?text=${product.name.replace(/\s/g, '+')}` }} 
                 style={styles.productImage} 
@@ -68,7 +68,14 @@ const ProductDetailScreen: React.FC = () => {
                 
                 <Text style={styles.productPrice}>R$ {parseFloat(product.price).toFixed(2)}</Text>
 
-                <View style={styles.descriptionSection}>
+                {/* Seção da Categoria */}
+                <View style={styles.section}>
+                    <Text style={styles.sectionTitle}>Categoria</Text>
+                    <Text style={styles.productInfo}>{product.category}</Text>
+                </View>
+
+                {/* Seção da Descrição */}
+                <View style={styles.section}>
                     <Text style={styles.sectionTitle}>Descrição</Text>
                     <Text style={styles.productDescription}>{productDescription}</Text>
                 </View>
@@ -85,7 +92,7 @@ const ProductDetailScreen: React.FC = () => {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#fff',
+        backgroundColor: '#f8f9fa',
     },
     centered: {
         flex: 1,
@@ -116,14 +123,18 @@ const styles = StyleSheet.create({
         color: '#007bff',
         marginBottom: 20,
     },
-    descriptionSection: {
-        marginBottom: 25,
+    section: {
+        marginBottom: 20,
     },
     sectionTitle: {
         fontSize: 18,
         fontWeight: 'bold',
         marginBottom: 8,
         color: '#333',
+    },
+    productInfo: {
+        fontSize: 16,
+        color: '#495057',
     },
     productDescription: {
         fontSize: 16,
@@ -138,6 +149,7 @@ const styles = StyleSheet.create({
         padding: 15,
         borderRadius: 12,
         elevation: 3,
+        marginTop: 10,
     },
     addToCartButtonText: {
         color: '#fff',
